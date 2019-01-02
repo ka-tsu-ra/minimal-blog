@@ -7,7 +7,26 @@ From December 11th 2018 to December 17th 2018, [polyfill.io](https://polyfill.io
 
 ## What is polyfill.io and how does it work?
 
-polyfill.io is a service which serves polyfills for features which are missing in the requesting user-agent. It works by reading the request url to figure out which features the website is wanting to polyfill and then reading the user-agent header to see what features are missing in from the user-agent and serving polyfills for the missing features that were included in the request url.
+Polyfill.io is a service which serves polyfills for features which are missing in the requesting user-agent. It works by reading the request url to figure out which features the website is wanting to polyfill and then reading the user-agent header to see what features are missing in from the user-agent and serving polyfills for the missing features that were included in the request url.
+
+## How the caching works
+
+Polyfill.io uses [Varnish Cache](https://varnish-cache.org/intro/), specifically it uses [Fastly's Varnish Cache](https://www.fastly.com/blog/benefits-using-varnish). When a request it made to polyfill.io, the Varnish Cache server will handle the request, create a "hash key" and check if an object in it's cache has the corresponding "hash key", if it does then it responds with the cached object.
+
+Varnish Cache is a programmable cache, which is great because it allows us define how to create the "hash key". We decided to use the <abbr title="Uniform Resource Locater">URL</abbr> path and query-parameters as the hash key because they are the interface to our <abbr title="Application Program Interface">API</abbr>. The rest of this post goes into how we made different request <abbr title="Uniform Resource Locater">URL</abbr>s end up being the same <abbr title="Uniform Resource Locater">URL</abbr> before Varnish Cache generates the hash key.
+
+The code used to generate the hash key:
+
+```
+sub vcl_hash {
+	...
+	set req.hash += req.url;
+	# We include return(hash) to stop the function falling through to the default VCL built into varnish, which for vcl_hash will add req.url and req.http.Host to the hash.
+	return(hash);
+}
+```
+
+<small>[You can also view the code on GitHub](https://github.com/Financial-Times/polyfill-service/blob/714623bdfff470b865c0e6f7746db5f6908f3acc/fastly/vcl/polyfill-service.vcl#L88-L98)</small>
 
 ## Normalising the user-agent header
 
