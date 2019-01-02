@@ -47,8 +47,9 @@ const IndexPage = ({
       <Hero>
         <h1>Hi.</h1>
         <p>
-          I&apos;m John Doe, a Senior UX Developer with five years of industry experience, specializing in developing
-          React apps with the best UX users can get.
+          I&apos;m Jake Champion, I work at the <abbr title="Financial Times">FT</abbr> on their front-end component
+          system, Origami. I used to work in <abbr title="Financial Times">FT</abbr> Labs and before that,{' '}
+          <abbr title="British Broadcasting Company">BBC</abbr> News World Service.
         </p>
         <Link to="/contact">
           <Button big>
@@ -60,7 +61,7 @@ const IndexPage = ({
         </Link>
       </Hero>
       <Content>
-        <SectionTitle>Latest stories</SectionTitle>
+        <SectionTitle>Latest Posts</SectionTitle>
         {postEdges.map(post => (
           <Article
             title={post.node.frontmatter.title}
