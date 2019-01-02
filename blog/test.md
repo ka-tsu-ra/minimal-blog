@@ -5,7 +5,9 @@ category: Polyfill.io
 ---
 The [Polyfill Service](https://polyfill.io) is a web service that serves JavaScript [polyfills](https://remysharp.com/2010/10/08/what-is-a-polyfill) only to the browsers which require them. It’s a service operated by The Financial Times, with Fastly sponsoring the CDN.
 
-As you can see from [our usage numbers](https://polyfill.io/v2/docs/usage) the service is quite popular, serving tens of millions of requests every day. Thankfully, on average, 95.6% of the traffic is served from the Fastly CDN and doesn’t need to go back to our servers.
+As you can see from [our usage numbers](https://polyfill.io/v2/docs/usage) the service is quite popular, serving hundreds of millions of requests every day. Thankfully, on average, 95.6% of the traffic is served from the Fastly CDN and doesn’t need to go back to our servers.
+
+![A graph of the usage numbers over the last 180 days. Daily usage is approximately 210 million.](/assets/screen-shot-2019-01-02-at-14.07.52.png "Usage numbers graph from https://polyfill.io/v2/docs/usage")
 
 We’re always looking for ways to improve our cache-hit ratio. Up until recently, our technique is to take the user-agent string from the browser requesting our service and normalise it to something more cacheable by only keeping the name, and the major and minor version of the browser.
 
@@ -33,3 +35,4 @@ The final thing we can do to improve the cacheing is to prevent users from busti
 
 By combining all of these changes we were able to serve 204 million requests in a single day, serving 99.3% of those requests from our CDN.
 
+![Pie chart showing the cache-hit ratio of the last 7 days. 99.3% are cache hits and 0.7% are cache misses.](/assets/screen-shot-2019-01-02-at-14.08.12.png "Cache-hit ratio pie chart from https://polyfill.io/v2/docs/usage")
