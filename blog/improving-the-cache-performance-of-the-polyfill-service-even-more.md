@@ -106,7 +106,7 @@ With all these functions in place the end result is that all 6 of those URLs bec
 
 In the previos section I omitted the fact that one of the options in the API is to set the User-Agent in the URL via the `ua` query parameter. TODO FINISH THIS.
 
-
+\----- The part below is not finished, probably no reason to read it -----
 
 
 
