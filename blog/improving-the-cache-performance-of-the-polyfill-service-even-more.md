@@ -100,11 +100,30 @@ Listing the URLs again, after this function has been used:
 
 The 5th and 6th URLs also return the same polyfill bundle as the other URLs, this is because `zebra` is not part of the API for configuring a polyfill bundle and if `unknown` is not set then the API sets it to `polyfill`. We can remove query parameters which are not part of the API and set default values for the options which have not been set. There are lots of options in the API and the code is rather verbose so I will link to the [source on GitHub if you want to read it](https://github.com/Financial-Times/polyfill-service/blob/714623bdfff470b865c0e6f7746db5f6908f3acc/fastly/vcl/main.vcl#L27-L137).
 
+Here is a shortened version of the function:
+
+<script type="application/json+fiddle">
+{
+  "title": "default values for api",
+  "origins": [
+    "https://polyfill.io"
+  ],
+  "vcl": {
+    "recv": "# Store original url for logging purposes.\ndeclare local var.original-url STRING;\nset var.original-url = req.url;\n\n# Store the url without the querystring into a variable for use later.\ndeclare local var.url STRING;\nset var.url = querystring.remove(req.url);\n\n# (?i) makes the regex case-insensitive\n# The regex will match only if their are characters after `unknown=` which are not an ampersand (&).\nif (req.url.qs ~ \"(?i)[^&=]*unknown=([^&]+)\") {\n  # Parameter has already been set, use the already set value.\n  # re.group.1 is the first regex capture group in the regex above.\n  set var.url = querystring.set(var.url, \"unknown\", re.group.1);\n} else {\n  # Parameter has not been set, use the default value\n  set var.url = querystring.set(var.url, \"unknown\", \"polyfill\");\n}\n\nset req.url = var.url;\n\nlog \"Original url: \" var.original-url;\nlog \"Updated  url: \" var.url;"
+  },
+  "reqUrl": "/v2/polyfill.js",
+  "reqMethod": "GET",
+  "purgeFirst": true,
+  "enableCluster": false,
+  "enableShield": false
+}
+</script>
+
 With all these functions in place the end result is that all 6 of those URLs become identical, which means they will have the same hash key inside Varnish Cache and therefore all point to the same single cached response, increasing the cache-hit ratio.
 
 ## Normalising the user-agent header inside Varnish Cache
 
-In the previos section I omitted the fact that one of the options in the API is to set the User-Agent in the URL via the `ua` query parameter. TODO FINISH THIS.
+In the previous section I omitted the fact that one of the options in the API is to set the User-Agent in the URL via the `ua` query parameter. TODO FINISH THIS.
 
 \----- The part below is not finished, probably no reason to read it -----
 
