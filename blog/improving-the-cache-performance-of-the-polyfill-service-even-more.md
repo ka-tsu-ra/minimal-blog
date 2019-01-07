@@ -46,6 +46,22 @@ We want to be able to have all these different URLs use the same hash key, the w
 
 If you look at the list of URLs you might notice that some of them have the exact same query parameters but in a different order. We can re-order the query parameters with a function that Fastly provide called [`querystring.sort`](https://docs.fastly.com/vcl/functions/querystring-sort/). Using just this function will make URLs 1 and 2 become the same as well as 3 and 4.
 
+<script type="application/json+fiddle">
+{
+  "origins": [
+    "https://polyfill.io"
+  ],
+  "vcl": {
+    "recv": "# Store original url for logging purposes.\ndeclare local var.original-url STRING;\nset var.original-url = req.url;\n\nset req.url = querystring.sort(req.url);\n\nlog \"Original url: \" var.original-url;\nlog \"Updated  url: \" req.url;"
+  },
+  "reqUrl": "/v3/polyfill.js?features=IntersectionObserver%2Cfetch&callback=polyfillsLoaded",
+  "reqMethod": "GET",
+  "purgeFirst": false,
+  "enableCluster": true,
+  "enableShield": false
+}
+</script>
+
 Listing the URLs again, now with the query parameters sorted:
 
 1. `polyfill.io/v3/polyfill.js?callback=polyfillsLoaded&features=IntersectionObserver,fetch`
@@ -126,8 +142,6 @@ With all these functions in place the end result is that all 6 of those URLs bec
 In the previous section I omitted the fact that one of the options in the API is to set the User-Agent in the URL via the `ua` query parameter. TODO FINISH THIS.
 
 \----- The part below is not finished, probably no reason to read it -----
-
-
 
  User-Agent headers vary a lot and new values are seen everyday, however most of the contents in a header is not of importance to polyfill.io, we only need to know the family and the major, minor and patch version of the user-agent. Versions 1 and 2 of polyfill.io had an endpoint which would take the user-agent as a query parameter and return a normalised user-agent header in the format \`user-agent-family/major-version.minor-version.patch-version.\`.
 
