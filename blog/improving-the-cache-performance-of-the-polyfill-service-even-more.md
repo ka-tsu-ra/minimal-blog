@@ -166,47 +166,10 @@ Luckily for polyfill.io we only care about the User-Agent family, major, and min
 
 In v3 we have implemented this API endpoint as a function in VCL, which has removed those complications around making two requests to the polyfill.io server. The way that we parse user-agents is by compiling the [uaparser.org](https://www.uaparser.org/) into VCL for the polyfill.io service and into JS for the [polyfill-library](https://github.com/Financial-Times/polyfill-library) npm package.
 
-https://fiddle.fastlydemo.net/fiddle/735e9d5a
+Unfortunately the code for parsing user-agents is too large to embed in a fiddle, you can view it at this link instead [fiddle.fastlydemo.net/fiddle/f857ab79](https://fiddle.fastlydemo.net/fiddle/f857ab79).
 
-\----- The part below is not finished, probably no reason to read it -----
+Normalising the User-Agent helps reduce the millions of different User-Agents down to the thousands of User-Agents that [uaparser.org](https://www.uaparser.org/) detects them as. We can improve on this still, polyfill.io supports 15 User-Agent families: Android, BlackBerry, Chrome, Edge, Edge Mobile, Firefox, Firefox Mobile, Internet Explorer, Internet Explorer Mobile, iOS Safari, iOS Chrome, Opera, Opera Mini, Opera Mobile, Samsung. If we detect that the User-Agent family is one we do not support, we can give it a generic unsupported name, such as `other` to ensure that all unsupported User-Agents generate the same internal URL and point to the same cached object.
 
- User-Agent headers vary a lot and new values are seen everyday, however most of the contents in a header is not of importance to polyfill.io, we only need to know the family and the major, minor and patch version of the user-agent. Versions 1 and 2 of polyfill.io had an endpoint which would take the user-agent as a query parameter and return a normalised user-agent header in the format \`user-agent-family/major-version.minor-version.patch-version.\`.
+Unfortunately the code for this is also too large to embed in a fiddle, you can view it at this link instead [fiddle.fastlydemo.net/fiddle/6a4eb0a1](https://fiddle.fastlydemo.net/fiddle/6a4eb0a1).
 
-E.G:
-
-```
-http https://polyfill.io/v2/normalizeUa\?ua\=Mozilla/5.0%20\(Macintosh\;%20Intel%20Mac%20OS%20X%2010_12_6\)%20AppleWebKit/537.36%20\(KHTML,%20like%20Gecko\)%20Chrome/71.0.3578.98%20Safari/537.36 -p h | grep "Normalized-User-Agent"
-```
-
-```
-Normalized-User-Agent: chrome/71.0.0
-```
-
-Having it as an endpoint on the backend server required custom <abbr title="Varnish Configuration Language">VCL</abbr> which rewrites requests to the polyfill bundle endpoints without a normalised user-agent header to instead go to the normalising endpoint and when it got a response, would issue a <abbr title="Varnish Configuration Language">VCL</abbr> restart for the origin request but with the addition of the normalised user-agent header.
-
-Having restarts be a core part of the system makes the normal request to response flow become more complicated.
-
-In version 3 of polyfill.io we decided to move the user-agent normalisation code from the backend and into the CDN via <abbr title="Varnish Configuration Language">VCL</abbr>. This bought back the simple request to response flow and meant that a single request to the CDN would make at most only one request to the backend. This alone wouldn't make a big difference to the cache-hit ratio, what did make a big difference was taking the normalised user agent and checking if it is a user-agent that polyfill.io supports. Polyfill.io supports 16 user-agents, if the user-agent is not one of those 16 we set the value to `other/0.0.0`. This meant that the url used for identifying a polyfill-bundle contained a user-agent family that was one we supported, or the value `other`, this is extremely useful for increasing the cache-hit ratio because if the user-agent is unsupported, it will be served the same bundle as any other unsupported user-agent so we might as well have that bundle stored under a url that would serve both requests.
-
-The user agents that are supported are:
-
-* Chrome
-* Android
-* BlackBerry
-* Edge
-* Edge Mobile
-* Internet Explorer
-* Internet Explorer Mobile
-* Safari
-* iOS Safari
-* iOS Chrome
-* Firefox
-* Firefox Mobile
-* Opera
-* Opera Mobile
-* Opera Mini
-* Samsung Mobile
-
-## Normalising the API.
-
-TODO
+This change is the one that brought about the biggest improvement in our cache-hit ratio. Instead of getting a different cache-entry for every browser family and version, we only get different cache-entries for browser family and versions we support. As of writing this blog post, that works out to be roughly 300 different cache entries (Chrome has roughly 70 releases, Edge has 6 etc).
