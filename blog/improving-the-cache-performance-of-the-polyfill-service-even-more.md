@@ -48,6 +48,7 @@ If you look at the list of URLs you might notice that some of them have the exac
 
 <script type="application/json+fiddle">
 {
+  "title": "Sorting Querystrings",
   "origins": [
     "https://polyfill.io"
   ],
@@ -69,7 +70,7 @@ Listing the URLs again, now with the query parameters sorted:
 3. `polyfill.io/v3/polyfill.js?callback=polyfillsLoaded&features=fetch,IntersectionObserver`
 4. `polyfill.io/v3/polyfill.js?callback=polyfillsLoaded&features=fetch,IntersectionObserver`
 5. `polyfill.io/v3/polyfill.js?callback=polyfillsLoaded&features=IntersectionObserver,fetch&unknown=polyfill`
-6. `polyfill.io/v3/polyfill.js?features=IntersectionObserver,fetch&callback=polyfillsLoaded&unknown=polyfill&zebra=striped`
+6. `polyfill.io/v3/polyfill.js?features=IntersectionObserver,fetch&callback=polyfillsLoaded&zebra=striped`
 
 Looking again at the list of URLs you might notice that the difference between 2. and 3. is the order the comma-separated features in the features parameter. We would need to sort those features by some manner in order to make them identical. Neither Varnish Cache not Fastly offer a pre-built function to sort a string, VCL also does not have a way to loop through items either. The way we solved this issue was by creating a function which takes a comma-separated string and turn it into a URL where each item in the comma-separated string is a query parameter, that way we can use the same `querystring.sort` function that we used earlier, we then turn the query parameters back into a comma-separated string.
 
@@ -77,6 +78,7 @@ Here is what that function looks like:
 
 <script type="application/json+fiddle">
 {
+  "title": "Sorting CSVs",
   "origins": [
     "https://polyfill.io"
   ],
@@ -98,12 +100,14 @@ Using this function will make URLs 1, 2, 3 and 4 identical.
 
 Listing the URLs again, after this function has been used:
 
-1. `polyfill.io/v3/polyfill.js?callback=polyfillsLoaded&features=fetch,IntersectionObserver`
-2. `polyfill.io/v3/polyfill.js?callback=polyfillsLoaded&features=fetch,IntersectionObserver`
-3. `polyfill.io/v3/polyfill.js?callback=polyfillsLoaded&features=fetch,IntersectionObserver`
-4. `polyfill.io/v3/polyfill.js?callback=polyfillsLoaded&features=fetch,IntersectionObserver`
+1. `polyfill.io/v3/polyfill.js?callback=polyfillsLoaded&features=IntersectionObserver,fetch`
+2. `polyfill.io/v3/polyfill.js?callback=polyfillsLoaded&features=IntersectionObserver,fetch`
+3. `polyfill.io/v3/polyfill.js?callback=polyfillsLoaded&features=IntersectionObserver,fetch`
+4. `polyfill.io/v3/polyfill.js?callback=polyfillsLoaded&features=IntersectionObserver,fetch`
 5. `polyfill.io/v3/polyfill.js?callback=polyfillsLoaded&features=IntersectionObserver,fetch&unknown=polyfill`
-6. `polyfill.io/v3/polyfill.js?features=IntersectionObserver,fetch&callback=polyfillsLoaded&unknown=polyfill&zebra=striped`
+6. `polyfill.io/v3/polyfill.js?features=IntersectionObserver,fetch&callback=polyfillsLoaded&zebra=striped`
+
+The 5th URL has configured `unknown` to `polyfill`, which happens to be the default value. If we add the default values for parameters which are not included, we can make URLs 1-5 become identical.
 
 The 5th and 6th URLs also return the same polyfill bundle as the other URLs, this is because `zebra` is not part of the API for configuring a polyfill bundle and if `unknown` is not set then the API sets it to `polyfill`. We can remove query parameters which are not part of the API and set default values for the options which have not been set. There are lots of options in the API and the code is rather verbose so I will link to the [source on GitHub if you want to read it](https://github.com/Financial-Times/polyfill-service/blob/714623bdfff470b865c0e6f7746db5f6908f3acc/fastly/vcl/main.vcl#L27-L137).
 
