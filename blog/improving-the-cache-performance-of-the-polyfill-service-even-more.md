@@ -54,10 +54,10 @@ If you look at the list of URLs you might notice that some of them have the exac
   "vcl": {
     "recv": "# Store original url for logging purposes.\ndeclare local var.original-url STRING;\nset var.original-url = req.url;\n\nset req.url = querystring.sort(req.url);\n\nlog \"Original url: \" var.original-url;\nlog \"Updated  url: \" req.url;"
   },
-  "reqUrl": "/v3/polyfill.js?features=IntersectionObserver%2Cfetch&callback=polyfillsLoaded",
+  "reqUrl": "/v3/polyfill.js?features=IntersectionObserver%2Cfetch&callback=polyfillsLoaded&zebra=striped",
   "reqMethod": "GET",
-  "purgeFirst": false,
-  "enableCluster": true,
+  "purgeFirst": true,
+  "enableCluster": false,
   "enableShield": false
 }
 </script>
@@ -82,7 +82,7 @@ Here is what that function looks like:
   ],
   "vcl": {
     "init": "sub sort_comma_separated_value {\n  # This function takes a CSV and tranforms it into a url where each\n  # comma-separated-value is a query-string parameter and then uses \n  # Fastly's querystring.sort function to sort the values. Once sorted\n  # it then turn the query-parameters back into a CSV.\n  # Set the CSV on the header `Sort-Value`.\n  # Returns the sorted CSV on the header `Sorted-Value`.\n\tdeclare local var.value STRING;\n\tset var.value = req.http.Sort-value;\n\n\t# If query value does not exist or is empty, set it to \"\"\n\tset var.value = if(var.value != \"\", var.value, \"\");\n\n\t# Replace all `&` characters with `^`, this is because `&` would break the value up into pieces.\n\tset var.value = regsuball(var.value, \"&\", \"^\");\n\n\t# Replace all `,` characters with `&` to break them into individual query values\n\t# Append `1-` infront of all the query values to make them simpler to transform later\n\tset var.value = \"1-\" regsuball(var.value, \",\", \"&1-\");\n\t\n\t# Create a url-like string in order for querystring.sort to work.\n\tset var.value = querystring.sort(\"https://www.example.com?\" var.value);\n\n\t# Grab all the query values from the sorted url\n\tset var.value = regsub(var.value, \"https://www.example.com\\?\", \"\");\n\t\n\t# Reverse all the previous transformations to get back the single `features` query value value\n\tset var.value = regsuball(var.value, \"1-\", \"\");\n\tset var.value = regsuball(var.value, \"&\", \",\");\n\tset var.value = regsuball(var.value, \"\\^\", \"&\");\n\n\tset req.http.Sorted-Value = var.value;\n}",
-    "recv": "# Store original url for logging purposes.\ndeclare local var.original-url STRING;\nset var.original-url = req.url;\n\nset req.url = querystring.sort(req.url);\nif (req.url.qs ~ \"(?i)[^&=]*features=([^&]+)\") {\n  # Need to decode %2C into ,\n  set req.http.Sort-Value = urldecode(re.group.1);\n  call sort_comma_separated_value;\n  set req.url = querystring.set(req.url, \"features\", req.http.Sorted-Value);\n}\n\nlog \"Original url: \" var.original-url;\nlog \"Updated  url: \" req.url;"
+    "recv": "# Store original url for logging purposes.\ndeclare local var.original-url STRING;\nset var.original-url = req.url;\n\nif (req.url.qs ~ \"(?i)[^&=]*features=([^&]+)\") {\n  # Need to decode %2C into ,\n  set req.http.Sort-Value = urldecode(re.group.1);\n  call sort_comma_separated_value;\n  set req.url = querystring.set(req.url, \"features\", req.http.Sorted-Value);\n}\n\nset req.url = querystring.sort(req.url);\n\nlog \"Original url: \" var.original-url;\nlog \"Updated  url: \" req.url;"
   },
   "reqUrl": "/v3/polyfill.js?features=IntersectionObserver%2Cfetch&callback=polyfillsLoaded&zebra=striped",
   "reqMethod": "GET",
