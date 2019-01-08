@@ -23,7 +23,7 @@ const GlobalStyle = createGlobalStyle`
   }
   a {
     color: ${theme.colors.grey.dark};
-    text-decoration: wavy underline;
+    text-decoration: underline;
     transition: all ${theme.transitions.normal};
   }
   a:hover {
