@@ -138,7 +138,7 @@ Listing the URLs again, after this function has been used:
 
 The 6th URL has set `unknown` to `polyfill` which just so happens to be the same as the default value for `unknown`. If we add the default values into the URL for the parameters which have not been set, we can make all the URLs in the list become identical. Remember, we use the URL as the hash key within Fastly, making these requests use the same URL internally will mean that they point to the same response in the cache, which is what we are trying to achieve.
 
-[You can view the code for this at fiddle.fastlydemo.net/fiddle/8771bc22](https://fiddle.fastlydemo.net/fiddle/8771bc22/embedded).
+[You can view the code for this at fiddle.fastlydemo.net/fiddle/8771bc22](https://fiddle.fastlydemo.net/fiddle/8771bc22/embedded)
 
 With all these functions in place the end result is that all 6 of those URLs become identical, which means they will have the same hash key inside Varnish Cache and therefore all point to the same single cached response, increasing the cache-hit ratio and decreasing the amount of requests that need to go all the way back to servers for polyfill.io.
 
@@ -150,10 +150,10 @@ Luckily for polyfill.io we only care about the User-Agent family, major, and min
 
 In v3 we have implemented this API endpoint as a function in VCL, which has removed those complications around making two requests to the polyfill.io server. The way that we parse user-agents is by compiling the [uaparser.org](https://www.uaparser.org/) into VCL for the polyfill.io service and into JS for the [polyfill-library](https://github.com/Financial-Times/polyfill-library) npm package.
 
-[You can view the code for this at fiddle.fastlydemo.net/fiddle/f857ab79](https://fiddle.fastlydemo.net/fiddle/f857ab79/embedded).
+[You can view the code for this at fiddle.fastlydemo.net/fiddle/f857ab79](https://fiddle.fastlydemo.net/fiddle/f857ab79/embedded)
 
 Normalising the User-Agent helps reduce the millions of different User-Agents down to the thousands of User-Agents that [uaparser.org](https://www.uaparser.org/) detects them as. We can improve on this still, polyfill.io supports 15 User-Agent families: Android, BlackBerry, Chrome, Edge, Edge Mobile, Firefox, Firefox Mobile, Internet Explorer, Internet Explorer Mobile, iOS Safari, iOS Chrome, Opera, Opera Mini, Opera Mobile, Samsung. If we detect that the User-Agent family is one we do not support, we can give it a generic unsupported name, such as `other` to ensure that all unsupported User-Agents generate the same internal URL and point to the same cached object.
 
-[You can view the code for this at fiddle.fastlydemo.net/fiddle/6a4eb0a1](https://fiddle.fastlydemo.net/fiddle/6a4eb0a1/embedded).
+[You can view the code for this at fiddle.fastlydemo.net/fiddle/6a4eb0a1](https://fiddle.fastlydemo.net/fiddle/6a4eb0a1/embedded)
 
 This change is the one that brought about the biggest improvement in our cache-hit ratio. Instead of getting a different cache-entry for every browser family and version, we only get different cache-entries for browser family and versions we support. As of writing this blog post, that works out to be roughly 300 different cache entries (Chrome has roughly 70 releases, Edge has 6 etc).
