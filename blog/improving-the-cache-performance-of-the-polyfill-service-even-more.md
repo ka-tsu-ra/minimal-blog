@@ -7,13 +7,16 @@ From December 11th 2018 to December 17th 2018, [polyfill.io](https://polyfill.io
 
 ## What is polyfill.io and how does it work?
 
-Polyfill.io is a service which serves polyfills for features which are missing in the requesting user-agent. It works by reading the request url to figure out which features the website is wanting to polyfill and then reading the user-agent header to see what features are missing in from the user-agent and serving polyfills for the missing features that were included in the request url.
+Polyfill.io is a service which serves polyfills for features which are missing in the requesting user-agent. It works in three broad steps:
+1. It reads the request url to figure out which features the website is wanting to polyfill
+2. It reads the user-agent header to see what features it is missing
+3. It serves polyfills for the missing features that were included in the request url
 
 ## How the caching works
 
-Polyfill.io uses [Varnish Cache](https://varnish-cache.org/intro/), specifically it uses [Fastly's Varnish Cache](https://www.fastly.com/blog/benefits-using-varnish). When a request is made to polyfill.io, the Varnish Cache server will handle the request, create a "hash key" and check if an object in it's cache has the corresponding "hash key", if it does then it responds with the cached object.
+Polyfill.io uses [Varnish Cache](https://varnish-cache.org/intro/), specifically it uses [Fastly's Varnish Cache](https://www.fastly.com/blog/benefits-using-varnish). When a request is made to polyfill.io, the Varnish Cache server will handle the request, create a "hash key" and check if an object in its cache has the corresponding hash key. If it does, then polyfill.io responds with the cached object.
 
-Varnish Cache is a programmable cache, which is great because it allows us define how to create the "hash key". We decided to use the <abbr title="Uniform Resource Locater">URL</abbr> path and query-parameters as the hash key because they are the interface to our <abbr title="Application Program Interface">API</abbr>. The rest of this post goes into how we made different request <abbr title="Uniform Resource Locater">URL</abbr>s end up being the same <abbr title="Uniform Resource Locater">URL</abbr> before Varnish Cache generates the hash key.
+Varnish Cache is a programmable cache, which is great because it allows us define how the hash key is created. We decided to use the <abbr title="Uniform Resource Locater">URL</abbr> path and query-parameters as the hash key because they are the interface to our <abbr title="Application Program Interface">API</abbr>. The rest of this post goes into how we made different request <abbr title="Uniform Resource Locater">URL</abbr>s end up being the same <abbr title="Uniform Resource Locater">URL</abbr> before Varnish Cache generates the hash key.
 
 The code used to generate the hash key:
 
@@ -30,7 +33,11 @@ sub vcl_hash {
 
 ## Normalising the query parameters
 
-The API for configuring a polyfill bundle is available via the query paramter. I.E. `polyfill.io/v3/polyfill.js?features=IntersectionObserver,fetch&callback=polyfillsLoaded` is configuring the polyfill bundle to contain polyfills for [`fetch`](https://developer.mozilla.org/en-US/docs/Web/API/WindowOrWorkerGlobalScope/fetch), [`IntersectionObserver`](https://developer.mozilla.org/en-US/docs/Web/API/IntersectionObserver), and to call `polyfillsLoaded` once done.
+The API for configuring a polyfill bundle is available via the query parameter. For example:
+```
+polyfill.io/v3/polyfill.js?features=IntersectionObserver,fetch&callback=polyfillsLoaded
+```
+is configuring the polyfill bundle to contain polyfills for [`fetch`](https://developer.mozilla.org/en-US/docs/Web/API/WindowOrWorkerGlobalScope/fetch), [`IntersectionObserver`](https://developer.mozilla.org/en-US/docs/Web/API/IntersectionObserver), and to call `polyfillsLoaded` once done.
 
 There are many ways to configure this exact same polyfill bundle.\
 A non-exhaustive list:
@@ -42,26 +49,11 @@ A non-exhaustive list:
 5. `polyfill.io/v3/polyfill.js?features=fetch,IntersectionObserver&callback=polyfillsLoaded&zebra=striped`
 6. `polyfill.io/v3/polyfill.js?features=IntersectionObserver,fetch&callback=polyfillsLoaded&unknown=polyfill`
 
-We want to be able to have all these different URLs use the same hash key, the way to do that is to get them all to have the same URL before the Varnish Cache creates the key.
+We want to be able to have all these different URLs use the same hash key. And the way we do that is to convert them all to the same URL before the Varnish Cache creates the key.
 
-If you look at the list of URLs you might notice that some of them have the exact same query parameters but in a different order. We can re-order the query parameters with a function that Fastly provide called [`querystring.sort`](https://docs.fastly.com/vcl/functions/querystring-sort/). Using just this function will make URLs 1 and 2 become the same as well as 3 and 4.
+Some of the URLs in the list have the exact same query parameters, only in different orders. We can re-order the query parameters with a function that Fastly provide called [`querystring.sort`](https://docs.fastly.com/vcl/functions/querystring-sort/). This function alone will turn URLs 1 and 2 into the same URL. It will do the same for URLs 3 and 4.
 
-<script type="application/json+fiddle">
-{
-  "title": "Sorting Querystrings",
-  "origins": [
-    "https://polyfill.io"
-  ],
-  "vcl": {
-    "recv": "# Store original url for logging purposes.\ndeclare local var.original-url STRING;\nset var.original-url = req.url;\n\nset req.url = querystring.sort(req.url);\n\nlog \"Original url: \" var.original-url;\nlog \"Updated  url: \" req.url;"
-  },
-  "reqUrl": "/v3/polyfill.js?features=fetch%2CIntersectionObserver&callback=polyfillsLoaded&zebra=striped",
-  "reqMethod": "GET",
-  "purgeFirst": true,
-  "enableCluster": false,
-  "enableShield": false
-}
-</script>
+[You can view the code for this at fiddle.fastlydemo.net/fiddle/2dca4d1c](https://fiddle.fastlydemo.net/fiddle/2dca4d1c/embedded)
 
 Listing the URLs again, now with the query parameters sorted:
 
@@ -72,29 +64,11 @@ Listing the URLs again, now with the query parameters sorted:
 5. `polyfill.io/v3/polyfill.js?callback=polyfillsLoaded&features=fetch,IntersectionObserver&zebra=striped`
 6. `polyfill.io/v3/polyfill.js?features=IntersectionObserver,fetch&callback=polyfillsLoaded&unknown=polyfill`
 
-Looking again at the list of URLs you might notice that the difference between 2. and 3. is the order the comma-separated features in the features parameter. We would need to sort those features by some manner in order to make them identical. Neither Varnish Cache not Fastly offer a pre-built function to sort a string, VCL also does not have a way to loop through items either. The way we solved this issue was by creating a function which takes a comma-separated string and turn it into a URL where each item in the comma-separated string is a query parameter, that way we can use the same `querystring.sort` function that we used earlier, we then turn the query parameters back into a comma-separated string.
+The list of URLS still has some other differences: one of those differences is the order of the comma-separated features in the features parameter isn't the same for URLs 2 and 3. We would need to sort those features by some manner in order to make them identical. Neither Varnish Cache nor Fastly offer a pre-built function to sort a string, VCL also does not have a way to loop through items either, which makes this a bit trickier to solve.
 
-Here is what that function looks like:
+The way we solved this issue was by creating a function which takes a comma-separated string and turns it into a URL where each item in the comma-separated string is a lone-standing query parameter. Then we can use the same `querystring.sort` function that we used earlier, and finally, we turn the query parameters back into a comma-separated string.
 
-<script type="application/json+fiddle">
-{
-  "title": "Sorting CSVs",
-  "origins": [
-    "https://polyfill.io"
-  ],
-  "vcl": {
-    "init": "sub sort_comma_separated_value {\n  # This function takes a CSV and tranforms it into a url where each\n  # comma-separated-value is a query-string parameter and then uses \n  # Fastly's querystring.sort function to sort the values. Once sorted\n  # it then turn the query-parameters back into a CSV.\n  # Set the CSV on the header `Sort-Value`.\n  # Returns the sorted CSV on the header `Sorted-Value`.\n\tdeclare local var.value STRING;\n\tset var.value = req.http.Sort-value;\n\n\t# If query value does not exist or is empty, set it to \"\"\n\tset var.value = if(var.value != \"\", var.value, \"\");\n\n\t# Replace all `&` characters with `^`, this is because `&` would break the value up into pieces.\n\tset var.value = regsuball(var.value, \"&\", \"^\");\n\n\t# Replace all `,` characters with `&` to break them into individual query values\n\t# Append `1-` infront of all the query values to make them simpler to transform later\n\tset var.value = \"1-\" regsuball(var.value, \",\", \"&1-\");\n\t\n\t# Create a url-like string in order for querystring.sort to work.\n\tset var.value = querystring.sort(\"https://www.example.com?\" var.value);\n\n\t# Grab all the query values from the sorted url\n\tset var.value = regsub(var.value, \"https://www.example.com\\?\", \"\");\n\t\n\t# Reverse all the previous transformations to get back the single `features` query value value\n\tset var.value = regsuball(var.value, \"1-\", \"\");\n\tset var.value = regsuball(var.value, \"&\", \",\");\n\tset var.value = regsuball(var.value, \"\\^\", \"&\");\n\n\tset req.http.Sorted-Value = var.value;\n}",
-    "recv": "# Store original url for logging purposes.\ndeclare local var.original-url STRING;\nset var.original-url = req.url;\n\nif (req.url.qs ~ \"(?i)[^&=]*features=([^&]+)\") {\n  # Need to decode %2C into ,\n  set req.http.Sort-Value = urldecode(re.group.1);\n  call sort_comma_separated_value;\n  set req.url = querystring.set(req.url, \"features\", req.http.Sorted-Value);\n}\n\nset req.url = querystring.sort(req.url);\n\nlog \"Original url: \" var.original-url;\nlog \"Updated  url: \" req.url;"
-  },
-  "reqUrl": "/v3/polyfill.js?features=fetch%2CIntersectionObserver&callback=polyfillsLoaded&zebra=striped",
-  "reqMethod": "GET",
-  "purgeFirst": true,
-  "enableCluster": false,
-  "enableShield": false
-}
-</script>
-
-<small>[You can also view the code on GitHub](https://github.com/Financial-Times/polyfill-service/blob/714623bdfff470b865c0e6f7746db5f6908f3acc/fastly/vcl/main.vcl#L3-L25)</small>
+[You can view the code for this at fiddle.fastlydemo.net/fiddle/a2950143](https://fiddle.fastlydemo.net/fiddle/a2950143/embedded)
 
 Using this function will make URLs 1, 2, 3 and 4 identical.
 
@@ -107,24 +81,9 @@ Listing the URLs again, after this function has been used:
 5. `polyfill.io/v3/polyfill.js?callback=polyfillsLoaded&features=IntersectionObserver,fetch&zebra=striped`
 6. `polyfill.io/v3/polyfill.js?features=IntersectionObserver,fetch&callback=polyfillsLoaded&unknown=polyfill`
 
-The 5th URL has configured `zebra` to `striped`, `zebra` is not part of the API for configuring a polyfill bundle. Let's add a function to only keep query parameters in the URL which are actually part of the public API. We can achieve this with a function that Fastly provide called [`querystring.regfilter_except`](https://docs.fastly.com/vcl/functions/querystring-regfilter-except/). Using this function will make URLs 1, 2, 3, 4, and 5 become identical.
+The 5th URL has configured `zebra` to `striped`, but `zebra` is not part of the API for configuring a polyfill bundle. Let's add a function to only keep query parameters in the URL which are actually part of the public API. We can achieve this with a function that Fastly provide called [`querystring.regfilter_except`](https://docs.fastly.com/vcl/functions/querystring-regfilter-except/). Using this function will make URLs 1, 2, 3, 4, and 5 become identical.
 
-<script type="application/json+fiddle">
-{
-  "title": "Keep query parameters which are part of the API",
-  "origins": [
-    "https://polyfill.io"
-  ],
-  "vcl": {
-    "recv": "# Store original url for logging purposes.\ndeclare local var.original-url STRING;\nset var.original-url = req.url;\n\n# Remove all querystring parameters which are not part of the public API.\nset req.url = querystring.regfilter_except(req.url, \"^(features|excludes|rum|unknown|flags|version|ua|callback|compression)$\");\n\nlog \"Original url: \" var.original-url;\nlog \"Updated  url: \" req.url;"
-  },
-  "reqUrl": "/v3/polyfill.js?features=fetch%2CIntersectionObserver&callback=polyfillsLoaded&zebra=striped",
-  "reqMethod": "GET",
-  "purgeFirst": false,
-  "enableCluster": true,
-  "enableShield": false
-}
-</script>
+[You can view the code for this at fiddle.fastlydemo.net/fiddle/784c6fc6](https://fiddle.fastlydemo.net/fiddle/784c6fc6/embedded)
 
 Listing the URLs again, after this function has been used:
 
@@ -136,7 +95,7 @@ Listing the URLs again, after this function has been used:
 6. `polyfill.io/v3/polyfill.js?features=IntersectionObserver,fetch&callback=polyfillsLoaded&unknown=polyfill`
 
 
-The 6th URL has set `unknown` to `polyfill` which just so happens to be the same as the default value for `unknown`. If we add the default values into the URL for the parameters which have not been set, we can make all the URLs in the list become identical. Remember, we use the URL as the hash key within Fastly, making these requests use the same URL internally will mean that they point to the same response in the cache, which is what we are trying to achieve.
+The 6th URL has set `unknown` to `polyfill` which just so happens to be the same as the default value for `unknown`. If we add the default values into the URL for the parameters which have not been set, we can make all the URLs in the list become identical. Remember, we use the URL as the hash key within Fastly, so making these requests use the same URL internally will mean that they point to the same response in the cache, which is what we are trying to achieve
 
 [You can view the code for this at fiddle.fastlydemo.net/fiddle/8771bc22](https://fiddle.fastlydemo.net/fiddle/8771bc22/embedded)
 
