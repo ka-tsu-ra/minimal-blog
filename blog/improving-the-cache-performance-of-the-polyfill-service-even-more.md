@@ -7,14 +7,14 @@ From December 11th 2018 to December 17th 2018, [polyfill.io](https://polyfill.io
 
 ## What is polyfill.io and how does it work?
 
-Polyfill.io is a service which serves polyfills for features which are missing in the requesting user-agent. It works in three broad steps:
+Polyfill.io is a service which serves polyfills for features which are missing in the requesting User-Agent. It works in three broad steps:
 1. It reads the request url to figure out which features the website is wanting to polyfill
-2. It reads the user-agent header to see what features it is missing
+2. It reads the User-Agent header to see what features it is missing
 3. It serves polyfills for the missing features that were included in the request url
 
 ## How the caching works
 
-Polyfill.io uses [Varnish Cache](https://varnish-cache.org/intro/), specifically it uses [Fastly's Varnish Cache](https://www.fastly.com/blog/benefits-using-varnish). When a request is made to polyfill.io, the Varnish Cache server will handle the request, create a "hash key" and check if an object in its cache has the corresponding hash key. If it does, then polyfill.io responds with the cached object.
+Polyfill.io uses [Varnish Cache](https://varnish-cache.org/intro/), specifically it uses [Fastly's Varnish Cache](https://www.fastly.com/blog/benefits-using-varnish). When a request is made to polyfill.io, the Varnish Cache server will handle the request, create a hash key and check if an object in its cache has the corresponding hash key. If it does, then polyfill.io responds with the cached object.
 
 Varnish Cache is a programmable cache, which is great because it allows us define how the hash key is created. We decided to use the <abbr title="Uniform Resource Locater">URL</abbr> path and query-parameters as the hash key because they are the interface to our <abbr title="Application Program Interface">API</abbr>. The rest of this post goes into how we made different request <abbr title="Uniform Resource Locater">URL</abbr>s end up being the same <abbr title="Uniform Resource Locater">URL</abbr> before Varnish Cache generates the hash key.
 
@@ -101,13 +101,13 @@ The 6th URL has set `unknown` to `polyfill` which just so happens to be the same
 
 With all these functions in place the end result is that all 6 of those URLs become identical, which means they will have the same hash key inside Varnish Cache and therefore all point to the same single cached response, increasing the cache-hit ratio and decreasing the amount of requests that need to go all the way back to servers for polyfill.io.
 
-## Normalising the user-agent header inside Varnish Cache
+## Normalising the User-Agent header inside Varnish Cache
 
-In the previous section I omitted the fact that one of the options in the API is to set the User-Agent in the URL via the `ua` query parameter. This is a very important feature with regards to caching because it means that we can have a different cached entry for each User-Agent making a request. This means that there will be a lot of cache entries and it will make the cache-hit ratio really low. The reason that would happen is because User-Agent values *vary a lot*; [whatismybrowser.com](https://developers.whatismybrowser.com/useragents/explore/) has collected 840,000 unique user-agents and keeps finding new ones every day.
+In the previous section I omitted the fact that one of the options in the API is to set the User-Agent in the URL via the `ua` query parameter. This is a very important feature with regards to caching because it means that we can have a different cached entry for each User-Agent making a request. This means that there will be a lot of cache entries and it will make the cache-hit ratio really low. The reason that would happen is because User-Agent values *vary a lot*; [whatismybrowser.com](https://developers.whatismybrowser.com/useragents/explore/) has collected 840,000 unique User-Agents and keeps finding new ones every day.
 
-Luckily for polyfill.io we only care about the User-Agent family, major, and minor version. In polyfill.io v1 and v2 we had an API endpoint that would take a User-Agent and return a version of it which only had the family, major, and minor version. This worked very well but introduced some complications in the VCL. Since the API endpoint was implemented in the polyfill.io server it meant that a request without a `ua` query parameter would first need to go to this ua-specific endpoint to find out what its normalised user-agent value was, and then go to its original destination to return a polyfill bundle.
+Luckily for polyfill.io we only care about the User-Agent family, major, and minor version. In polyfill.io v1 and v2 we had an API endpoint that would take a User-Agent and return a version of it which only had the family, major, and minor version. This worked very well but introduced some complications in the VCL. Since the API endpoint was implemented in the polyfill.io server it meant that a request without a `ua` query parameter would first need to go to this ua-specific endpoint to find out what its normalised User-Agent value was, and then go to its original destination to return a polyfill bundle.
 
-In v3 we have implemented this API endpoint as a function in VCL, which has removed the complications around making two requests to the polyfill.io server. The way that we parse user-agents now is by compiling the [uaparser.org](https://www.uaparser.org/) into VCL for the polyfill.io service and into JS for the [polyfill-library](https://github.com/Financial-Times/polyfill-library) npm package.
+In v3 we have implemented this API endpoint as a function in VCL, which has removed the complications around making two requests to the polyfill.io server. The way that we parse User-Agents now is by compiling the [uaparser.org](https://www.uaparser.org/) into VCL for the polyfill.io service and into JS for the [polyfill-library](https://github.com/Financial-Times/polyfill-library) npm package.
 
 [You can view the code for this at fiddle.fastlydemo.net/fiddle/f857ab79](https://fiddle.fastlydemo.net/fiddle/f857ab79/embedded)
 
